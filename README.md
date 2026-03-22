@@ -14,38 +14,19 @@ This is a simple match-3 game inspired by Candy Crush, built with plain HTML, CS
 6.  Matching a Super Candy will clear its entire row and column.
 7.  Reach the target score to win the game!
 
-## Setup
+## How to Run
 
-The game uses sound files that are not included in the repository. You can generate them using the provided Python script.
-
-### Prerequisites
-
-*   Python 3
-*   `pip` (Python package installer)
-
-### Steps
-
-1.  **Clone the repository:**
+1.  Clone the repository:
     ```bash
     git clone https://github.com/ssrtist/candy.git
     cd candy
     ```
+2.  Open the `index.html` file in your web browser.
 
-2.  **Install the required Python packages:**
-    ```bash
-    pip install -r requirements.txt
-    ```
-
-3.  **Generate the sound files:**
-    ```bash
-    python generate_sounds.py
-    ```
-
-4.  **Open `index.html` in your web browser to play the game.**
+That's it! The game is ready to play.
 
 ## Technologies Used
 
 *   HTML
 *   CSS
 *   JavaScript
-*   Python (`gTTS` library for sound generation)
