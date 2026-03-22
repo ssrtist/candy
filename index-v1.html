@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Super Dramatic Candy Crush</title>
+    <style>
+        :root {
+            --bg-color: #0f0c29;
+            --board-bg: rgba(255, 255, 255, 0.1);
+            --candy-size: 60px;
+            --gap: 8px;
+            --swap-speed: 0.4s;
+            --pop-speed: 0.6s;
+            --fall-speed: 0.5s;
+        }
+
+        body {
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+            color: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+        }
+
+        h1 {
+            margin-bottom: 5px;
+            font-size: 2.5rem;
+            background: linear-gradient(to bottom, #fff, #f1c40f);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            filter: drop-shadow(0 0 10px rgba(241, 196, 15, 0.5));
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .game-container {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .stats {
+            display: flex;
+            gap: 40px;
+            font-size: 24px;
+            font-weight: bold;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            padding: 12px 30px;
+            border-radius: 20px;
+            border: 1px solid rgba(255,255,255,0.2);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+        }
+
+        .target { color: #f1c40f; }
+
+        #board {
+            display: grid;
+            grid-template-columns: repeat(8, var(--candy-size));
+            grid-template-rows: repeat(8, var(--candy-size));
+            gap: var(--gap);
+            background: var(--board-bg);
+            backdrop-filter: blur(15px);
+            padding: var(--gap);
+            border-radius: 15px;
+            border: 2px solid rgba(255,255,255,0.1);
+            box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+            position: relative;
+            transition: transform 0.1s;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translate(0, 0); }
+            25% { transform: translate(-8px, 8px); }
+            50% { transform: translate(8px, -8px); }
+            75% { transform: translate(-8px, -8px); }
+        }
+        .shake { animation: shake 0.2s ease-in-out; }
+
+        .candy {
+            width: var(--candy-size);
+            height: var(--candy-size);
+            border-radius: 12px;
+            cursor: pointer;
+            transition: transform var(--swap-speed) cubic-bezier(0.68, -0.55, 0.265, 1.55), 
+                        background-color 0.3s, 
+                        opacity var(--pop-speed);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            box-sizing: border-box;
+            position: relative;
+            user-select: none;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }
+
+        .candy::after {
+            content: '';
+            position: absolute;
+            top: 10%;
+            left: 10%;
+            width: 80%;
+            height: 40%;
+            background: linear-gradient(to bottom, rgba(255,255,255,0.3), rgba(255,255,255,0));
+            border-radius: 50%;
+            pointer-events: none;
+        }
+
+        .candy:hover {
+            transform: scale(1.1) rotate(5deg);
+            z-index: 5;
+        }
+
+        .candy.selected {
+            outline: 4px solid #fff;
+            transform: scale(1.2);
+            z-index: 10;
+            box-shadow: 0 0 30px #fff;
+            animation: pulse 1s infinite alternate;
+        }
+
+        /* Super Candy Styling */
+        .candy.super {
+            border: 3px solid #fff;
+            box-shadow: 0 0 20px #fff, inset 0 0 10px #fff;
+            animation: super-pulse 0.8s infinite alternate;
+        }
+
+        @keyframes super-pulse {
+            from { transform: scale(1); filter: brightness(1.2) contrast(1.2); }
+            to { transform: scale(1.1); filter: brightness(1.5) contrast(1.5); }
+        }
+
+        @keyframes pulse {
+            from { box-shadow: 0 0 10px #fff; }
+            to { box-shadow: 0 0 30px #fff, 0 0 50px rgba(255,255,255,0.5); }
+        }
+
+        .candy.empty {
+            opacity: 0;
+            transform: scale(0) rotate(180deg);
+        }
+
+        /* Candy Colors */
+        .red { background: radial-gradient(circle at 30% 30%, #ff5e62, #ff9966); }
+        .blue { background: radial-gradient(circle at 30% 30%, #00d2ff, #3a7bd5); }
+        .green { background: radial-gradient(circle at 30% 30%, #11998e, #38ef7d); }
+        .yellow { background: radial-gradient(circle at 30% 30%, #f7971e, #ffd200); }
+        .purple { background: radial-gradient(circle at 30% 30%, #834d9b, #d04ed6); }
+        .orange { background: radial-gradient(circle at 30% 30%, #f4c4f3, #fc67fa); }
+
+        @keyframes dramatic-pop {
+            0% { transform: scale(1) rotate(0); opacity: 1; filter: brightness(1); }
+            50% { transform: scale(1.6) rotate(15deg); opacity: 0.8; filter: brightness(2); }
+            100% { transform: scale(0) rotate(-45deg); opacity: 0; }
+        }
+
+        .candy.popping {
+            animation: dramatic-pop var(--pop-speed) forwards cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            z-index: 20;
+        }
+
+        /* Win Overlay */
+        #overlay {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            border-radius: 15px;
+            z-index: 100;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 1s;
+        }
+
+        #overlay.visible { opacity: 1; pointer-events: all; }
+
+        #overlay h2 {
+            font-size: 64px;
+            color: #f1c40f;
+            margin-bottom: 30px;
+            text-shadow: 0 0 30px rgba(241, 196, 15, 0.8);
+            animation: title-glow 2s infinite alternate;
+        }
+
+        @keyframes title-glow {
+            from { text-shadow: 0 0 20px rgba(241, 196, 15, 0.5); transform: scale(1); }
+            to { text-shadow: 0 0 50px rgba(241, 196, 15, 1); transform: scale(1.1); }
+        }
+
+        .btn {
+            padding: 15px 40px;
+            font-size: 24px;
+            font-weight: bold;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.4);
+            transition: all 0.3s;
+        }
+
+        .btn:hover { transform: translateY(-5px) scale(1.05); box-shadow: 0 15px 30px rgba(0,0,0,0.5); }
+        .btn-green { background: linear-gradient(to right, #2ecc71, #27ae60); color: white; }
+        .btn-blue { background: linear-gradient(to right, #3498db, #2980b9); color: white; }
+
+        .combo-text {
+            position: absolute;
+            font-size: 48px;
+            font-weight: 900;
+            color: #fff;
+            text-shadow: 0 0 10px #f1c40f, 0 0 20px #e67e22;
+            pointer-events: none;
+            z-index: 1000;
+            animation: combo-float 1s forwards ease-out;
+        }
+
+        @keyframes combo-float {
+            0% { transform: translate(-50%, -50%) scale(0.5); opacity: 0; }
+            50% { transform: translate(-50%, -100%) scale(1.5); opacity: 1; }
+            100% { transform: translate(-50%, -200%) scale(1); opacity: 0; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="game-container">
+        <h1>Candy Crush Super</h1>
+        <div class="stats">
+            <div>Score: <span id="score">0</span></div>
+            <div class="target">Target: <span id="target-score">1000</span></div>
+        </div>
+        <div id="board">
+            <div id="overlay">
+                <h2 id="win-message">SUPERB!</h2>
+                <button class="btn btn-green" id="play-again">Claim Glory</button>
+            </div>
+        </div>
+        <button class="btn btn-blue" id="reset-btn" style="margin-top: 20px;">Restart Journey</button>
+    </div>
+
+    <script>
+        const boardElement = document.getElementById('board');
+        const scoreElement = document.getElementById('score');
+        const resetBtn = document.getElementById('reset-btn');
+        const playAgainBtn = document.getElementById('play-again');
+        const overlay = document.getElementById('overlay');
+        
+        const width = 8;
+        const targetScore = 1000;
+        const candyTypes = [
+            { color: 'red', emoji: '🍓', superEmoji: '👦' },
+            { color: 'blue', emoji: '💎', superEmoji: '👧' },
+            { color: 'green', emoji: '🍏', superEmoji: '👦' },
+            { color: 'yellow', emoji: '⭐', superEmoji: '👧' },
+            { color: 'purple', emoji: '🍇', superEmoji: '👦' },
+            { color: 'orange', emoji: '🍑', superEmoji: '👧' }
+        ];
+        
+        let score = 0;
+        let board = [];
+        let firstSelection = null;
+        let isProcessing = false;
+        let gameActive = true;
+        let lastMoveIndex = -1;
+
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        
+        function playSound(freq, type = 'sine', duration = 0.2, volume = 0.1) {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const oscillator = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            oscillator.type = type;
+            oscillator.frequency.setValueAtTime(freq, audioCtx.currentTime);
+            oscillator.frequency.exponentialRampToValueAtTime(freq / 3, audioCtx.currentTime + duration);
+            gain.gain.setValueAtTime(volume, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+            oscillator.connect(gain);
+            gain.connect(audioCtx.destination);
+            oscillator.start();
+            oscillator.stop(audioCtx.currentTime + duration);
+        }
+
+        const SFX = {
+            select: () => playSound(523.25, 'triangle', 0.1, 0.05),
+            swap: () => playSound(392, 'sine', 0.3, 0.05),
+            match: (combo) => playSound(659.25 + (combo * 150), 'square', 0.4, 0.04),
+            super: () => {
+                playSound(880, 'sawtooth', 0.5, 0.05);
+                setTimeout(() => playSound(1320, 'sawtooth', 0.5, 0.05), 100);
+            },
+            drop: () => playSound(261.63, 'sine', 0.1, 0.02),
+            win: () => {
+                [523, 659, 783, 1046].forEach((f, i) => setTimeout(() => playSound(f, 'sine', 0.6, 0.1), i * 150));
+            }
+        };
+
+        function showComboText(text, x, y) {
+            const div = document.createElement('div');
+            div.className = 'combo-text';
+            div.textContent = text;
+            div.style.left = x + 'px';
+            div.style.top = y + 'px';
+            document.body.appendChild(div);
+            setTimeout(() => div.remove(), 1000);
+        }
+
+        function createBoard() {
+            Array.from(boardElement.children).forEach(child => { if (child.id !== 'overlay') boardElement.removeChild(child); });
+            board = [];
+            for (let i = 0; i < width * width; i++) {
+                const candy = document.createElement('div');
+                candy.className = 'candy';
+                candy.setAttribute('id', i);
+                let type;
+                do { type = candyTypes[Math.floor(Math.random() * candyTypes.length)]; } while (wouldCreateMatch(i, type.color));
+                candy.classList.add(type.color);
+                candy.textContent = type.emoji;
+                candy.addEventListener('click', handleCandyClick);
+                boardElement.appendChild(candy);
+                board.push(candy);
+            }
+        }
+
+        function wouldCreateMatch(index, color) {
+            const row = Math.floor(index / width), col = index % width;
+            if (col >= 2 && board[index-1]?.classList.contains(color) && board[index-2]?.classList.contains(color)) return true;
+            if (row >= 2 && board[index-width]?.classList.contains(color) && board[index-2*width]?.classList.contains(color)) return true;
+            return false;
+        }
+
+        function handleCandyClick() {
+            if (isProcessing || !gameActive) return;
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            if (!firstSelection) {
+                firstSelection = this;
+                firstSelection.classList.add('selected');
+                SFX.select();
+            } else {
+                const secondSelection = this;
+                if (firstSelection === secondSelection) {
+                    firstSelection.classList.remove('selected');
+                    firstSelection = null;
+                    return;
+                }
+                const firstId = parseInt(firstSelection.id), secondId = parseInt(secondSelection.id);
+                const validMoves = [firstId - 1, firstId + 1, firstId - width, firstId + width];
+                const isAdjacent = validMoves.includes(secondId) && 
+                    !( (firstId % width === 0 && secondId === firstId - 1) || (firstId % width === width - 1 && secondId === firstId + 1) );
+                if (isAdjacent) {
+                    lastMoveIndex = secondId;
+                    swapCandies(firstSelection, secondSelection);
+                } else {
+                    firstSelection.classList.remove('selected');
+                    firstSelection = secondSelection;
+                    firstSelection.classList.add('selected');
+                    SFX.select();
+                }
+            }
+        }
+
+        async function swapCandies(c1, c2, force = false) {
+            isProcessing = true;
+            SFX.swap();
+            const color1 = getCandyColor(c1), color2 = getCandyColor(c2);
+            const emoji1 = c1.textContent, emoji2 = c2.textContent;
+            const super1 = c1.classList.contains('super'), super2 = c2.classList.contains('super');
+
+            updateCandy(c1, color2, emoji2, super2);
+            updateCandy(c2, color1, emoji1, super1);
+            c1.classList.remove('selected');
+            await new Promise(r => setTimeout(r, 450));
+
+            if (!force) {
+                if (!checkMatches()) {
+                    SFX.swap();
+                    updateCandy(c1, color1, emoji1, super1);
+                    updateCandy(c2, color2, emoji2, super2);
+                    setTimeout(() => { firstSelection = null; isProcessing = false; }, 450);
+                } else {
+                    firstSelection = null;
+                    await processMatches();
+                }
+            } else {
+                firstSelection = null;
+                isProcessing = false;
+            }
+        }
+
+        function updateCandy(candy, color, emoji, isSuper) {
+            candy.className = 'candy ' + color + (isSuper ? ' super' : '');
+            candy.textContent = emoji;
+        }
+
+        function getCandyColor(candy) {
+            return candyTypes.find(t => candy.classList.contains(t.color))?.color;
+        }
+
+        function checkMatches() {
+            for (let i = 0; i < width * width; i++) {
+                const col = i % width;
+                if (col < width - 2) {
+                    const c = getCandyColor(board[i]);
+                    if (c && getCandyColor(board[i+1]) === c && getCandyColor(board[i+2]) === c) return true;
+                }
+            }
+            for (let i = 0; i < width * (width - 2); i++) {
+                const c = getCandyColor(board[i]);
+                if (c && getCandyColor(board[i+width]) === c && getCandyColor(board[i+2*width]) === c) return true;
+            }
+            return false;
+        }
+
+        async function processMatches() {
+            let combo = 0;
+            while (true) {
+                const groups = [];
+                // Horizontal
+                for (let r = 0; r < width; r++) {
+                    let count = 1;
+                    for (let c = 1; c <= width; c++) {
+                        const idx = r * width + c;
+                        if (c < width && getCandyColor(board[idx]) === getCandyColor(board[idx-1])) {
+                            count++;
+                        } else {
+                            if (count >= 3) {
+                                const group = [];
+                                for (let k = 1; k <= count; k++) group.push(idx - k);
+                                groups.push({ indices: group, color: getCandyColor(board[group[0]]) });
+                            }
+                            count = 1;
+                        }
+                    }
+                }
+                // Vertical
+                for (let c = 0; c < width; c++) {
+                    let count = 1;
+                    for (let r = 1; r <= width; r++) {
+                        const idx = r * width + c;
+                        const prevIdx = (r-1) * width + c;
+                        if (r < width && getCandyColor(board[idx]) === getCandyColor(board[prevIdx])) {
+                            count++;
+                        } else {
+                            if (count >= 3) {
+                                const group = [];
+                                for (let k = 1; k <= count; k++) group.push(prevIdx - (k-1) * width);
+                                groups.push({ indices: group, color: getCandyColor(board[group[0]]) });
+                            }
+                            count = 1;
+                        }
+                    }
+                }
+
+                if (groups.length === 0) break;
+
+                const toClear = new Set();
+                const superSpawn = [];
+
+                groups.forEach(g => {
+                    g.indices.forEach(idx => toClear.add(idx));
+                    if (g.indices.length >= 4) {
+                        let spawnAt = g.indices.includes(lastMoveIndex) ? lastMoveIndex : g.indices[Math.floor(g.indices.length / 2)];
+                        superSpawn.push({ index: spawnAt, color: g.color, size: g.indices.length });
+                    }
+                });
+
+                // Trigger existing super candies in the clear set
+                let expanded = true;
+                while (expanded) {
+                    expanded = false;
+                    toClear.forEach(idx => {
+                        if (board[idx].classList.contains('super')) {
+                            const row = Math.floor(idx / width), col = idx % width;
+                            // Line blast
+                            for (let i = 0; i < width; i++) {
+                                if (!toClear.has(row * width + i)) { toClear.add(row * width + i); expanded = true; }
+                                if (!toClear.has(i * width + col)) { toClear.add(i * width + col); expanded = true; }
+                            }
+                            // Area blast
+                            for (let r = row - 1; r <= row + 1; r++) {
+                                for (let c = col - 1; c <= col + 1; c++) {
+                                    if (r >= 0 && r < width && c >= 0 && c < width) {
+                                        const bIdx = r * width + c;
+                                        if (!toClear.has(bIdx)) { toClear.add(bIdx); expanded = true; }
+                                    }
+                                }
+                            }
+                        }
+                    });
+                }
+
+                combo++;
+                score += toClear.size * 10 * combo;
+                scoreElement.textContent = score;
+                boardElement.classList.add('shake');
+                setTimeout(() => boardElement.classList.remove('shake'), 200);
+                SFX.match(combo);
+
+                toClear.forEach(idx => board[idx].classList.add('popping'));
+                await new Promise(r => setTimeout(r, 600));
+
+                toClear.forEach(idx => { board[idx].className = 'candy empty'; board[idx].textContent = ''; });
+                
+                // Spawn Super Candies
+                superSpawn.forEach(s => {
+                    const type = candyTypes.find(t => t.color === s.color);
+                    updateCandy(board[s.index], s.color, type.superEmoji, true);
+                    SFX.super();
+                });
+
+                await fillGaps();
+                if (score >= targetScore && gameActive) winGame();
+                lastMoveIndex = -1;
+            }
+            isProcessing = false;
+        }
+
+        async function fillGaps() {
+            for (let c = 0; c < width; c++) {
+                let emptySpaces = 0;
+                for (let r = width - 1; r >= 0; r--) {
+                    const idx = r * width + c;
+                    if (board[idx].classList.contains('empty')) {
+                        emptySpaces++;
+                    } else if (emptySpaces > 0) {
+                        const b = board[idx], target = board[idx + emptySpaces * width];
+                        updateCandy(target, getCandyColor(b), b.textContent, b.classList.contains('super'));
+                        updateCandy(b, '', '', false);
+                        b.classList.add('empty');
+                    }
+                }
+            }
+            for (let i = 0; i < width * width; i++) {
+                if (board[i].classList.contains('empty')) {
+                    const type = candyTypes[Math.floor(Math.random() * candyTypes.length)];
+                    updateCandy(board[i], type.color, type.emoji, false);
+                    SFX.drop();
+                }
+            }
+            await new Promise(r => setTimeout(r, 400));
+        }
+
+        function winGame() { gameActive = false; overlay.classList.add('visible'); SFX.win(); }
+        function initGame() { score = 0; scoreElement.textContent = score; gameActive = true; firstSelection = null; isProcessing = false; overlay.classList.remove('visible'); createBoard(); }
+        resetBtn.addEventListener('click', initGame);
+        playAgainBtn.addEventListener('click', initGame);
+        initGame();
+    </script>
+</body>
+</html>
