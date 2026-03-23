@@ -9,7 +9,7 @@
             --bg-color: #0f0c29;
             --board-bg: rgba(255, 255, 255, 0.05);
             --swap-speed: 0.5s;
-            --pop-speed: 0.8s;
+            --pop-speed: 1s;
             --v-padding: 12px;
         }
 
@@ -98,8 +98,9 @@
         }
 
         .candy.super {
-            animation: super-glow 1s infinite alternate;
             border-width: 3px;
+            filter: brightness(1.7) drop-shadow(0 0 15px currentColor);
+            transform: scale(1.05);
         }
 
         .candy.hint {
@@ -141,14 +142,10 @@
             to { transform: translate(var(--tx), var(--ty)) scale(0); opacity: 0; }
         }
 
-        @keyframes super-glow {
-            from { filter: brightness(1.2) drop-shadow(0 0 5px currentColor); transform: scale(1); }
-            to { filter: brightness(1.7) drop-shadow(0 0 15px currentColor); transform: scale(1.05); }
-        }
-
         @keyframes pop {
-            0% { transform: scale(1) rotate(0); opacity: 1; }
-            100% { transform: scale(1.5) rotate(90deg); opacity: 0; }
+            0% { transform: scale(1) rotate(0); opacity: 1; filter: brightness(1); }
+            40% { filter: brightness(2) drop-shadow(0 0 15px currentColor) scale(1.1); }
+            100% { transform: scale(1.5) rotate(90deg); opacity: 0; filter: brightness(1); }
         }
         .popping { animation: pop var(--pop-speed) forwards; z-index: 20; }
 
@@ -239,7 +236,7 @@
         <div class="diff-options">
             <button class="btn" onclick="startGame('easy')">
                 <div class="grid-icon small-grid"><span></span><span></span><span></span><span></span></div>
-                Easy (500)
+                Easy (1000)
             </button>
             <button class="btn" onclick="startGame('hard')">
                 <div class="grid-icon big-grid"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
@@ -312,6 +309,10 @@
             }
         }
 
+        function playNiceSfx() {
+            playSfx(659, 'sine', 0.2, 0.8); // E5 note
+        }
+
         function showDifficultySelection() {
             diffOverlay.classList.remove('hidden');
             winOverlay.classList.add('hidden');
@@ -320,7 +321,7 @@
         }
 
         function startGame(diff) {
-            config = diff === 'easy' ? { size: 5, target: 500 } : { size: 7, target: 1000 };
+            config = diff === 'easy' ? { size: 5, target: 1000 } : { size: 7, target: 1000 };
             activeColors = diff === 'easy' ? ['red', 'yellow', 'green'] : ['red', 'purple', 'blue', 'green', 'orange'];
             score = 0;
             scoreEl.textContent = '0';
@@ -483,6 +484,10 @@
                 const matches = findMatches();
                 if (!matches.length) break;
                 
+                if (combo === 0) {
+                    playNiceSfx();
+                }
+                
                 const toClear = new Set(), spawns = [];
                 matches.forEach(m => {
                     m.forEach(i => toClear.add(i));
@@ -522,7 +527,7 @@
                     createBurst(i, getComputedStyle(c).color, triggerIdx);
                 });
 
-                await new Promise(r => setTimeout(r, 800));
+                await new Promise(r => setTimeout(r, 1000));
                 
                 toClear.forEach(i => { 
                     if (board[i]) {
