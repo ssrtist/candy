@@ -194,7 +194,7 @@
         }
 
         .overlay h2 {
-            font-size: 2.5rem;
+            font-size: 2rem;
             color: #f1c40f;
             margin-bottom: 30px;
             text-align: center;
@@ -205,7 +205,7 @@
             flex-direction: column;
             gap: 20px;
             width: 90%;
-            max-width: 350px;
+            max-width: 300px;
         }
 
         @keyframes shake {
@@ -261,7 +261,7 @@
 
         const colors = ['red', 'purple', 'blue', 'green', 'orange', 'yellow'];
         const emojis = { red: '🍓', purple: '🍇', blue: '💎', green: '🍏', orange: '🍑', yellow: '⭐' };
-        const superEmojis = { red: '🧨', purple: '🍭', blue: '🌀', green: '🏮', orange: '💥', yellow: '🌟' };
+        const superEmoji = '💥';
 
         let activeColors = [];
         let config = { size: 5, target: 500 };
@@ -288,8 +288,7 @@
             const color = getCol(candyEl);
             if (!color) return;
 
-            const isSuper = candyEl.classList.contains('super');
-            const fileName = isSuper ? `${color}_super.mp3` : `${color}.mp3`;
+            const fileName = `${color}.mp3`;
             
             try {
                 const audio = new Audio(`sounds/${fileName}`);
@@ -311,7 +310,13 @@
         }
 
         function playNiceSfx() {
-            playSfx(659, 'sine', 0.2, 0.8); // E5 note
+            try {
+                const audio = new Audio(`sounds/nice.mp3`);
+                audio.volume = 0.5;
+                audio.play();
+            } catch (e) {
+                console.error("Could not play sound:", e);
+            }
         }
 
         function showDifficultySelection() {
@@ -367,7 +372,10 @@
 
         function createCandy(col, emoji, idx, startTop = null) {
             const c = document.createElement('div');
-            c.className = 'candy ' + col;
+            c.className = 'candy ' + (col || '');
+            if (col === null) {
+                c.classList.add('super');
+            }
             c.style.width = tileSize + 'px';
             c.style.height = tileSize + 'px';
             c.textContent = emoji;
@@ -437,46 +445,76 @@
             c1.classList.remove('selected');
             playSfx(330, 'sine', 0.2, 0.8);
             
-            await new Promise(r => setTimeout(r, 650));
+            await new Promise(r => setTimeout(r, 500));
             
             if (!force && !findMatches().length) {
+                playSfx(220, 'square', 0.2, 0.6);
                 // Swap back
                 [board[idx1], board[idx2]] = [board[idx2], board[idx1]];
+                c1.style.transitionDuration = '0.3s';
+                c2.style.transitionDuration = '0.3s';
                 c1.style.left = p1.left + 'px'; c1.style.top = p1.top + 'px';
                 c2.style.left = p2.left + 'px'; c2.style.top = p2.top + 'px';
-                setTimeout(() => { firstSelection = null; isProcessing = false; resetHintTimer(); }, 650);
+                
+                await new Promise(r => setTimeout(r, 300));
+                c1.style.transitionDuration = '';
+                c2.style.transitionDuration = '';
+                firstSelection = null; 
+                isProcessing = false; 
+                resetHintTimer();
             } else {
                 firstSelection = null;
                 await process(idx1);
             }
         }
 
-        function update(c, col, txt, sup) {
-            c.className = 'candy ' + (col || '') + (sup ? ' super' : '');
-            c.textContent = txt || '';
+        function getCol(c) {
+            if (!c || c.classList.contains('super')) return null;
+            return colors.find(clr => c.classList.contains(clr)) || null;
         }
 
-        function getCol(c) { return c ? colors.find(clr => c.classList.contains(clr)) : null; }
-
         function findMatches() {
-            const matches = [];
-            for (let r = 0; r < config.size; r++) {
-                let count = 1;
-                for (let c = 1; c <= config.size; c++) {
-                    const idx = r * config.size + c;
-                    if (c < config.size && getCol(board[idx]) === getCol(board[idx-1])) { count++; } 
-                    else { if (count >= 3) { const g = []; for(let k=1; k<=count; k++) g.push(idx-k); matches.push(g); } count = 1; }
+            const allMatches = new Set();
+
+            function getMatches(indices) {
+                for (let i = 0; i < indices.length - 2; i++) {
+                    const slice = indices.slice(i, i + 3).map(idx => board[idx]);
+                    const cols = slice.map(getCol);
+                    const solidCols = cols.filter(Boolean);
+                    
+                    if (solidCols.length === 0) { // All super
+                        addSlice(indices, i, 3, null);
+                        continue;
+                    }
+
+                    const matchColor = solidCols[0];
+                    if (solidCols.every(c => c === matchColor)) {
+                        let end = i + 3;
+                        while (end < indices.length) {
+                            const nextCol = getCol(board[indices[end]]);
+                            if (nextCol === null || nextCol === matchColor) end++;
+                            else break;
+                        }
+                        addSlice(indices, i, end - i, matchColor);
+                        i = end - 1;
+                    }
                 }
+            }
+            
+            function addSlice(indices, start, length, color) {
+                const newMatch = [];
+                for(let k=0; k<length; k++) newMatch.push(indices[start+k]);
+                allMatches.add(newMatch);
+            }
+
+            for (let r = 0; r < config.size; r++) {
+                getMatches(Array.from({length: config.size}, (_, c) => r * config.size + c));
             }
             for (let c = 0; c < config.size; c++) {
-                let count = 1;
-                for (let r = 1; r <= config.size; r++) {
-                    const idx = r * config.size + c, prev = (r-1) * config.size + c;
-                    if (r < config.size && getCol(board[idx]) === getCol(board[prev])) { count++; } 
-                    else { if (count >= 3) { const g = []; for(let k=1; k<=count; k++) g.push(prev - (k-1)*config.size); matches.push(g); } count = 1; }
-                }
+                getMatches(Array.from({length: config.size}, (_, r) => r * config.size + c));
             }
-            return matches;
+            
+            return [...allMatches];
         }
 
         async function process(triggerIdx = -1) {
@@ -484,18 +522,18 @@
             while (true) {
                 const matches = findMatches();
                 if (!matches.length) break;
-                
-                if (combo === 0) {
-                    playNiceSfx();
-                }
+
+                if (combo === 0) playNiceSfx();
                 
                 const toClear = new Set(), spawns = [];
                 matches.forEach(m => {
                     m.forEach(i => toClear.add(i));
-                    if (m.length >= 4) spawns.push({ idx: m[0], col: getCol(board[m[0]]) });
+                    if (m.length >= 4) {
+                        const spawnIdx = m.includes(triggerIdx) ? triggerIdx : m[0];
+                        spawns.push({ idx: spawnIdx });
+                    }
                 });
 
-                // Handle Supers
                 let grow = true;
                 while(grow) {
                     grow = false;
@@ -515,7 +553,6 @@
                 score += matchScore;
                 scoreEl.textContent = score;
 
-                // Visual effects
                 boardEl.classList.add('shake');
                 setTimeout(() => boardEl.classList.remove('shake'), 200);
                 playSfx(523 + combo*100, 'square', 0.3, 0.8);
@@ -524,7 +561,7 @@
                     const c = board[i];
                     if (!c) return;
                     c.classList.add('popping');
-                    showFloatingScore(i, combo > 1 ? `+${matchScore/toClear.size} x${combo}` : `+${matchScore/toClear.size}`);
+                    showFloatingScore(i, combo > 1 ? `+${10*combo}` : `+10`);
                     createBurst(i, getComputedStyle(c).color, triggerIdx);
                 });
 
@@ -537,12 +574,14 @@
                     }
                 });
 
-                spawns.forEach(s => {
-                    const c = createCandy(s.col, superEmojis[s.col], s.idx);
-                    c.classList.add('super');
-                    boardEl.appendChild(c);
-                    board[s.idx] = c;
-                    playSfx(880, 'sawtooth', 0.4, 0.8);
+                const uniqueSpawns = [...new Map(spawns.map(s => [s.idx, s])).values()];
+                uniqueSpawns.forEach(s => {
+                    if (board[s.idx] === null) {
+                        const c = createCandy(null, superEmoji, s.idx);
+                        boardEl.appendChild(c);
+                        board[s.idx] = c;
+                        playSfx(880, 'sawtooth', 0.4, 0.8);
+                    }
                 });
 
                 await refill();
@@ -617,7 +656,7 @@
                 const dist = 50 + Math.random() * 50;
                 p.style.setProperty('--tx', Math.cos(angle) * dist + 'px');
                 p.style.setProperty('--ty', Math.sin(angle) * dist + 'px');
-                const duration = 0.6 + Math.random() * 0.4;
+                const duration = 0.5;
                 p.style.animation = `particle-fade ${duration}s ease-out forwards`;
                 boardEl.appendChild(p);
                 setTimeout(() => p.remove(), duration * 1000);
@@ -665,9 +704,38 @@
             for (let i = 0; i < temp.length; i++) {
                 const r = Math.floor(i/config.size), c = i%config.size;
                 const col = getCol(temp[i]);
-                if (!col) continue;
-                if (c < config.size - 2 && getCol(temp[i+1]) === col && getCol(temp[i+2]) === col) return true;
-                if (r < config.size - 2 && getCol(temp[i+config.size]) === col && getCol(temp[i+2*config.size]) === col) return true;
+                if (!col && !temp[i].classList.contains('super')) continue;
+
+                // Create a temporary board for match finding
+                const tempBoard = [...temp];
+                const newFindMatches = () => {
+                    const matches = [];
+                    // Simplified row check
+                    for (let r_ = 0; r_ < config.size; r_++) {
+                        for (let c_ = 0; c_ < config.size - 2; c_++) {
+                            const group = [tempBoard[r_*config.size+c_], tempBoard[r_*config.size+c_+1], tempBoard[r_*config.size+c_+2]];
+                            const groupCols = group.map(getCol);
+                            const color = groupCols.find(c => c !== null);
+                            if (groupCols.every(c => c === null || c === color)) {
+                                matches.push([r_*config.size+c_, r_*config.size+c_+1, r_*config.size+c_+2]);
+                            }
+                        }
+                    }
+                    // Simplified col check
+                    for (let c_ = 0; c_ < config.size; c_++) {
+                        for (let r_ = 0; r_ < config.size - 2; r_++) {
+                            const group = [tempBoard[r_*config.size+c_], tempBoard[(r_+1)*config.size+c_], tempBoard[(r_+2)*config.size+c_]];
+                            const groupCols = group.map(getCol);
+                            const color = groupCols.find(c => c !== null);
+                            if (groupCols.every(c => c === null || c === color)) {
+                                matches.push([r_*config.size+c_, (r_+1)*config.size+c_, (r_+2)*config.size+c_]);
+                            }
+                        }
+                    }
+                    return matches;
+                };
+                
+                if (newFindMatches().length > 0) return true;
             }
             return false;
         }

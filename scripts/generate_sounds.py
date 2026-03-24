@@ -31,7 +31,7 @@ print("Generating sound files for candy objects...")
 # Generate sounds for regular candies
 for color, name in candy_objects.items():
     try:
-        tts = gTTS(text=name, lang='en', slow=False)
+        tts = gTTS(text=name, lang='en', tld='co.uk', slow=False)
         file_path = os.path.join(output_dir, f"{color}.mp3")
         tts.save(file_path)
         print(f"Successfully generated sound for '{name}' at {file_path}")
@@ -41,7 +41,7 @@ for color, name in candy_objects.items():
 # Generate sounds for super candies
 for color, name in super_candy_objects.items():
     try:
-        tts = gTTS(text=name, lang='en', slow=False)
+        tts = gTTS(text=name, lang='en', tld='co.uk', slow=False)
         file_path = os.path.join(output_dir, f"{color}_super.mp3")
         tts.save(file_path)
         print(f"Successfully generated sound for '{name}' at {file_path}")
@@ -52,9 +52,17 @@ for color, name in super_candy_objects.items():
 print("\nAll sound files generated.")
 
 try:
-    tts = gTTS(text="You win!", lang='en', slow=False)
+    tts = gTTS(text="You win!", lang='en', tld='co.uk', slow=False)
     file_path = os.path.join(output_dir, "you_win.mp3")
     tts.save(file_path)
     print(f"Successfully generated sound for 'You win!' at {file_path}")
 except Exception as e:
     print(f"Failed to generate sound for 'You win!': {e}")
+
+try:
+    tts = gTTS(text="nice", lang='en', tld='co.uk', slow=False)
+    file_path = os.path.join(output_dir, "nice.mp3")
+    tts.save(file_path)
+    print(f"Successfully generated sound for 'nice' at {file_path}")
+except Exception as e:
+    print(f"Failed to generate sound for 'nice': {e}")
