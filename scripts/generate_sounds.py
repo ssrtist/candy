@@ -18,12 +18,7 @@ candy_objects = {
 }
 
 super_candy_objects = {
-    'red': 'dynamite',
-    'purple': 'lollipop',
-    'blue': 'cyclone',
-    'green': 'lantern',
-    'orange': 'explosion',
-    'yellow': 'glowing star'
+    'explosion': 'explosion'
 }
 
 print("Generating sound files for candy objects...")

@@ -241,7 +241,7 @@
             </button>
             <button class="btn" onclick="startGame('hard')">
                 <div class="grid-icon big-grid"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
-                Hard (1000)
+                Hard (1500)
             </button>
         </div>
     </div>
@@ -285,10 +285,11 @@
         }
 
         function playAnnounceSfx(candyEl) {
+            const isSuper = candyEl.classList.contains('super');
             const color = getCol(candyEl);
-            if (!color) return;
+            if (!color && !isSuper) return;
 
-            const fileName = `${color}.mp3`;
+            const fileName = isSuper ? `explosion.mp3` : `${color}.mp3`;
             
             try {
                 const audio = new Audio(`sounds/${fileName}`);
@@ -327,7 +328,7 @@
         }
 
         function startGame(diff) {
-            config = diff === 'easy' ? { size: 5, target: 1000 } : { size: 7, target: 1000 };
+            config = diff === 'easy' ? { size: 5, target: 1000 } : { size: 7, target: 1500 };
             activeColors = diff === 'easy' ? ['red', 'yellow', 'green'] : ['red', 'purple', 'blue', 'green', 'orange'];
             score = 0;
             scoreEl.textContent = '0';
