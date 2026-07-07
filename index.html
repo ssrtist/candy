@@ -109,6 +109,20 @@
             z-index: 5;
         }
 
+        .candy.hint::after {
+            content: attr(data-hint);
+            position: absolute;
+            bottom: -25px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #000;
+            color: #fff;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 14px;
+            white-space: nowrap;
+        }
+
         @keyframes hint-pulse {
             from { transform: scale(1); filter: brightness(1); }
             to { transform: scale(1.1); filter: brightness(1.5); }
@@ -158,6 +172,7 @@
             margin-right: 8px;
         }
         .small-grid { grid-template-columns: repeat(2, 6px); }
+        .one-grid { grid-template-columns: repeat(1, 6px); }
         .big-grid { grid-template-columns: repeat(3, 6px); }
         .grid-icon span { width: 6px; height: 6px; border: 1px solid currentColor; display: block; }
 
@@ -236,6 +251,10 @@
     <div id="diff-overlay" class="overlay">
         <h2>SELECT DIFFICULTY</h2>
         <div class="diff-options">
+            <button class="btn" onclick="startGame('very-easy')">
+                <div class="grid-icon one-grid"><span></span></div>
+                Very Easy (1000)
+            </button>
             <button class="btn" onclick="startGame('easy')">
                 <div class="grid-icon small-grid"><span></span><span></span><span></span><span></span></div>
                 Easy (1000)
@@ -273,6 +292,9 @@
         let active = false;
         let tileSize = 0;
         let hintTimer = null;
+        let isVeryEasy = false;
+        let hintState = 0; // 0: no hint, 1: waiting for first tap, 2: waiting for second tap
+        let veryEasyHintedMove = null;
 
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         function playSfx(f, type='sine', d=0.2, v=0.5) {
@@ -283,6 +305,14 @@
             g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + d);
             o.connect(g); g.connect(audioCtx.destination);
             o.start(); o.stop(audioCtx.currentTime + d);
+        }
+
+        function speak(text) {
+            if ('speechSynthesis' in window) {
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'en-US';
+                speechSynthesis.speak(utterance);
+            }
         }
 
         function playAnnounceSfx(candyEl) {
@@ -329,8 +359,17 @@
         }
 
         function startGame(diff) {
-            config = diff === 'easy' ? { size: 5, target: 1000 } : { size: 7, target: 1500 };
-            activeColors = diff === 'easy' ? ['red', 'yellow', 'green'] : ['red', 'purple', 'blue', 'green', 'orange'];
+            isVeryEasy = diff === 'very-easy';
+            if (diff === 'very-easy') {
+                config = { size: 5, target: 1000 };
+                activeColors = ['red', 'yellow', 'green'];
+            } else if (diff === 'easy') {
+                config = { size: 5, target: 1000 };
+                activeColors = ['red', 'yellow', 'green', 'blue'];
+            } else { // hard
+                config = { size: 7, target: 1500 };
+                activeColors = ['red', 'purple', 'blue', 'green', 'orange'];
+            }
             score = 0;
             scoreEl.textContent = '0';
             goalEl.textContent = config.target;
@@ -340,7 +379,12 @@
             isProcessing = false;
             firstSelection = null;
             playSfx(880, 'sine', 0.2, 1.0);
-            resetHintTimer();
+
+            if (isVeryEasy) {
+                showVeryEasyHint();
+            } else {
+                resetHintTimer();
+            }
         }
 
         function getPos(idx) {
@@ -400,6 +444,31 @@
 
         function handleTouch() {
             if (isProcessing || !active) return;
+            
+            if (isVeryEasy) {
+                if (hintState === 1 && this.classList.contains('hint')) {
+                    this.classList.remove('hint');
+                    delete this.dataset.hint;
+                    
+                    hintState = 2;
+                    const otherCandy = board[veryEasyHintedMove.i2];
+                    otherCandy.classList.add('hint');
+                    const hintText = "Switch Here";
+                    otherCandy.dataset.hint = hintText;
+                    speak(hintText);
+                    
+                    firstSelection = this; 
+                    playSfx(440, 'triangle', 0.1, 0.8);
+
+                } else if (hintState === 2 && this.classList.contains('hint')) {
+                    const id1 = board.indexOf(firstSelection);
+                    const id2 = board.indexOf(this);
+                    clearHint(true); 
+                    swap(id1, id2);
+                }
+                return; 
+            }
+
             resetHintTimer();
             clearHint();
 
@@ -463,10 +532,11 @@
                 c2.style.transitionDuration = '';
                 firstSelection = null; 
                 isProcessing = false; 
-                resetHintTimer();
+                if (isVeryEasy) showVeryEasyHint(); else resetHintTimer();
             } else {
                 firstSelection = null;
                 await process(idx1);
+                if (isVeryEasy && active) showVeryEasyHint();
             }
         }
 
@@ -590,7 +660,7 @@
                 if (score >= config.target && active) { win(); return; }
             }
             isProcessing = false;
-            resetHintTimer();
+            if (!isVeryEasy) resetHintTimer();
         }
 
         async function refill() {
@@ -667,15 +737,35 @@
 
         function resetHintTimer() {
             clearTimeout(hintTimer);
-            hintTimer = setTimeout(showHint, 5000);
+            if (!isVeryEasy) {
+                hintTimer = setTimeout(showHint, 5000);
+            }
         }
 
-        function clearHint() {
-            document.querySelectorAll('.candy.hint').forEach(c => c.classList.remove('hint'));
+        function clearHint(keepState = false) {
+            document.querySelectorAll('.candy.hint').forEach(c => {
+                c.classList.remove('hint');
+                delete c.dataset.hint;
+            });
+            if (!keepState) {
+                hintState = 0;
+            }
+        }
+
+        function showVeryEasyHint() {
+            if (isProcessing || !active) return;
+            veryEasyHintedMove = findPossibleMove();
+            if (veryEasyHintedMove) {
+                board[veryEasyHintedMove.i1].classList.add('hint');
+                const hintText = "Tap Here";
+                board[veryEasyHintedMove.i1].dataset.hint = hintText;
+                speak(hintText);
+                hintState = 1;
+            }
         }
 
         function showHint() {
-            if (isProcessing || !active) return;
+            if (isProcessing || !active || isVeryEasy) return;
             const move = findPossibleMove();
             if (move) {
                 board[move.i1].classList.add('hint');
@@ -685,61 +775,53 @@
 
         function findPossibleMove() {
             for (let i = 0; i < board.length; i++) {
-                const r = Math.floor(i/config.size), c = i%config.size;
                 // Check right
-                if (c < config.size - 1) {
-                    if (checkSwap(i, i + 1)) return { i1: i, i2: i + 1 };
+                if ((i + 1) % config.size !== 0) {
+                    if (checkSwapMakesMatch(i, i + 1)) return { i1: i, i2: i + 1 };
                 }
                 // Check down
-                if (r < config.size - 1) {
-                    if (checkSwap(i, i + config.size)) return { i1: i, i2: i + config.size };
+                if (i < config.size * (config.size - 1)) {
+                    if (checkSwapMakesMatch(i, i + config.size)) return { i1: i, i2: i + config.size };
                 }
             }
-            return null;
+             // As a fallback, reshuffle if no moves are found.
+            console.log("No possible moves! Reshuffling board...");
+            setupBoard();
+            return findPossibleMove();
         }
 
-        function checkSwap(idx1, idx2) {
-            const temp = [...board];
-            [temp[idx1], temp[idx2]] = [temp[idx2], temp[idx1]];
+        function checkSwapMakesMatch(idx1, idx2) {
+            const tempBoard = [...board];
+            [tempBoard[idx1], tempBoard[idx2]] = [tempBoard[idx2], tempBoard[idx1]];
             
-            // Simplified match check for temp board
-            for (let i = 0; i < temp.length; i++) {
-                const r = Math.floor(i/config.size), c = i%config.size;
-                const col = getCol(temp[i]);
-                if (!col && !temp[i].classList.contains('super')) continue;
+            const originalFindMatches = (b) => {
+                const allMatches = [];
+                 for (let r = 0; r < config.size; r++) {
+                    for (let c = 0; c < config.size - 2; c++) {
+                        const i1 = r * config.size + c;
+                        const i2 = i1 + 1;
+                        const i3 = i1 + 2;
+                        const col1 = getCol(b[i1]);
+                        if (col1 && col1 === getCol(b[i2]) && col1 === getCol(b[i3])) {
+                           allMatches.push([i1,i2,i3]);
+                        }
+                    }
+                }
+                for (let c = 0; c < config.size; c++) {
+                    for (let r = 0; r < config.size - 2; r++) {
+                        const i1 = r * config.size + c;
+                        const i2 = i1 + config.size;
+                        const i3 = i1 + 2 * config.size;
+                        const col1 = getCol(b[i1]);
+                         if (col1 && col1 === getCol(b[i2]) && col1 === getCol(b[i3])) {
+                           allMatches.push([i1,i2,i3]);
+                        }
+                    }
+                }
+                return allMatches;
+            };
 
-                // Create a temporary board for match finding
-                const tempBoard = [...temp];
-                const newFindMatches = () => {
-                    const matches = [];
-                    // Simplified row check
-                    for (let r_ = 0; r_ < config.size; r_++) {
-                        for (let c_ = 0; c_ < config.size - 2; c_++) {
-                            const group = [tempBoard[r_*config.size+c_], tempBoard[r_*config.size+c_+1], tempBoard[r_*config.size+c_+2]];
-                            const groupCols = group.map(getCol);
-                            const color = groupCols.find(c => c !== null);
-                            if (groupCols.every(c => c === null || c === color)) {
-                                matches.push([r_*config.size+c_, r_*config.size+c_+1, r_*config.size+c_+2]);
-                            }
-                        }
-                    }
-                    // Simplified col check
-                    for (let c_ = 0; c_ < config.size; c_++) {
-                        for (let r_ = 0; r_ < config.size - 2; r_++) {
-                            const group = [tempBoard[r_*config.size+c_], tempBoard[(r_+1)*config.size+c_], tempBoard[(r_+2)*config.size+c_]];
-                            const groupCols = group.map(getCol);
-                            const color = groupCols.find(c => c !== null);
-                            if (groupCols.every(c => c === null || c === color)) {
-                                matches.push([r_*config.size+c_, (r_+1)*config.size+c_, (r_+2)*config.size+c_]);
-                            }
-                        }
-                    }
-                    return matches;
-                };
-                
-                if (newFindMatches().length > 0) return true;
-            }
-            return false;
+            return originalFindMatches(tempBoard).length > 0;
         }
 
         function win() { 
